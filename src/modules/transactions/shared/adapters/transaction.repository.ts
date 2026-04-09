@@ -33,8 +33,23 @@ export class TransactionRepository implements ITransactionRepository {
   }
 
   async findById(id: string): Promise<Transaction | null> {
-    // TODO: Implement the lookup for the challenge.
-    // Keep the mapping consistent with the rest of the repository.
-    throw new Error('TODO: implement findById');
+    const entity = await this.repo.findOne({
+      where: { id },
+    });
+
+    if (!entity) return null;
+ 
+    return {
+      id: entity.id,
+      accountId: entity.accountId,
+      amount: Money.create(entity.amount, entity.currency),
+      type: entity.type,
+      status: entity.status,
+      externalReference: entity.externalReference,
+      igvAmount: Money.create(entity.igvAmount, entity.currency),
+      totalAmount: Money.create(entity.totalAmount, entity.currency),
+      createdAt: entity.createdAt,
+      updatedAt: entity.updatedAt,
+    };
   }
 }
