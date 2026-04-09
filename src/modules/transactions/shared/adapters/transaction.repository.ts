@@ -33,9 +33,6 @@ export class TransactionRepository implements ITransactionRepository {
   }
 
   async findById(id: string): Promise<Transaction | null> {
-    // TODO: Implement the lookup for the challenge.
-    // Keep the mapping consistent with the rest of the repository.
-    
     const entity = await this.repo.findOne({
       where: { id },
     });

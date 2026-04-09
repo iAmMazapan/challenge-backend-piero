@@ -74,3 +74,137 @@ Si todas pasan, es muy probable que las funciones pedidas hayan quedado implemen
 Con la API levantada:
 
 - `http://localhost:3000/docs`
+
+
+## Solución implementada
+
+### Alcance
+Se completó la implementación del endpoint GET /transactions/:id mediante la implementación del método findById en el repositorio de transacciones.
+
+Lo que estaba previo:
+- Las 4 funciones de negocio (calculateIgv, calculateTotalWithIgv, isGreaterThanMinimumAmount, reviewTransaction)
+- El controller, handler, DTOs y servicios asociados al GET
+- Toda la arquitectura, filtros y interceptores
+
+Lo que se implementó:
+- Método findById(id: string) en el adapter del repositorio
+
+Archivo modificado:
+- src/modules/transactions/shared/adapters/transaction.repository.ts
+
+### Detalle técnico
+
+Se implementó findById(id: string) con TypeORM y mapeo consistente al modelo de dominio (Transaction):
+
+```typescript
+async findById(id: string): Promise<Transaction | null> {
+  const entity = await this.repo.findOne({ where: { id } });
+  
+  if (!entity) return null;
+  
+  return {
+    id: entity.id,
+    accountId: entity.accountId,
+    amount: Money.create(entity.amount, entity.currency),
+    type: entity.type,
+    status: entity.status,
+    externalReference: entity.externalReference,
+    igvAmount: Money.create(entity.igvAmount, entity.currency),
+    totalAmount: Money.create(entity.totalAmount, entity.currency),
+    createdAt: entity.createdAt,
+    updatedAt: entity.updatedAt,
+  };
+}
+```
+
+El método:
+- Consulta mediante findOne de TypeORM
+- Retorna null si no existe el registro
+- Mapea campos numéricos a objetos Money (amount, igvAmount, totalAmount)
+- Mantiene consistencia con el método save existente
+- Incluye campos de auditoría (createdAt, updatedAt)
+
+### Validación funcional
+
+Con la API levantada en http://localhost:3000/docs:
+
+1. POST /transactions crea una transacción:
+
+Solicitud:
+```json
+{
+  "accountId": "acc_123",
+  "amount": 100,
+  "currency": "PEN",
+  "type": "credit",
+  "externalReference": "ext_001"
+}
+```
+
+Respuesta (HTTP 201):
+```json
+{
+  "data": {
+    "id": "bba47710-d55b-466f-9b78-17a358b7a143"
+  }
+}
+```
+
+2. GET /transactions/bba47710-d55b-466f-9b78-17a358b7a143 recupera la transacción:
+
+URL: http://localhost:3000/transactions/bba47710-d55b-466f-9b78-17a358b7a143
+
+Respuesta (HTTP 200):
+```json
+{
+  "data": {
+    "id": "bba47710-d55b-466f-9b78-17a358b7a143",
+    "accountId": "acc_123",
+    "amount": 100,
+    "currency": "PEN",
+    "type": "credit",
+    "status": "approved",
+    "externalReference": "ext_001",
+    "igvAmount": 18,
+    "totalAmount": 118,
+    "createdAt": "2026-04-09T20:10:37.354Z",
+    "updatedAt": "2026-04-09T20:10:37.391Z"
+  }
+}
+```
+
+Notar que:
+- El status cambió a "approved" (procesado por el módulo de fraude automáticamente)
+- igvAmount es 18 (100 * 0.18)
+- totalAmount es 118 (100 + 18)
+
+3. GET /transactions/{id-inexistente} retorna 404:
+
+Respuesta (HTTP 404):
+```json
+{
+  "error": {
+    "code": "ENTITY_NOT_FOUND",
+    "message": "Transaction not found"
+  }
+}
+```
+
+### Tests unitarios
+
+Se ejecutaron todos los tests con resultado:
+
+```
+Test Suites: 4 passed, 4 total
+Tests: 8 passed, 8 total
+```
+
+Ningún test unitario fue modificado. La implementación cumple con los contratos establecidos.
+
+### Nota de entorno local
+
+Para crear tablas automáticamente desde las entidades en desarrollo local:
+
+```bash
+DB_SYNCHRONIZE=true npm run start:dev
+```
